@@ -10,22 +10,43 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
+    - name: Ensure Python is available
+      run: python3 --version
+
     - name: Generate file structure
       run: |
-        python3 -c "
+        python3 << 'EOF'
 import os
 
 def list_files(startpath):
     for root, dirs, files in os.walk(startpath):
         level = root.replace(startpath, '').count(os.sep)
         indent = ' ' * 4 * level
-        print('{}{}/'.format(indent, os.path.basename(root)))
+        print(f"{indent}{os.path.basename(root)}/")
         subindent = ' ' * 4 * (level + 1)
         for f in files:
-            print('{}{}'.format(subindent, f))
+            print(f"{subindent}{f}")
 
 list_files('.')
-        " > file_structure.txt
+EOF
+
+    - name: Save file structure to text file
+      run: |
+        python3 -c "
+import os
+
+def list_files(startpath, output_file):
+    with open(output_file, 'w') as f:
+        for root, dirs, files in os.walk(startpath):
+            level = root.replace(startpath, '').count(os.sep)
+            indent = ' ' * 4 * level
+            f.write(f'{indent}{os.path.basename(root)}/\\n')
+            subindent = ' ' * 4 * (level + 1)
+            for file in files:
+                f.write(f'{subindent}{file}\\n')
+
+list_files('.', 'file_structure.txt')
+        "
 
     - name: Upload file structure
       uses: actions/upload-artifact@v2
