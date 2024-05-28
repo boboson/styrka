@@ -8,86 +8,40 @@
  */
 
 // Exit if accessed directly.
-if (!defined('ABSPATH')) {
+if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
 // Define constants.
-define('STYRKA_ASSESSMENT_VERSION', '1.0');
-define('STYRKA_ASSESSMENT_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('STYRKA_ASSESSMENT_PLUGIN_URL', plugin_dir_url(__FILE__));
+define( 'STYRKA_ASSESSMENT_VERSION', '1.0' );
+define( 'STYRKA_ASSESSMENT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'STYRKA_ASSESSMENT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-// Ensure the base plugin is active
-function styrka_assessment_check_base_plugin() {
-    if (!is_plugin_active('styrka-community/styrka-community.php')) {
-        add_action('admin_notices', 'styrka_assessment_base_plugin_notice');
-        deactivate_plugins(plugin_basename(__FILE__));
-    }
-}
-add_action('admin_init', 'styrka_assessment_check_base_plugin');
-
-function styrka_assessment_base_plugin_notice() {
-    echo '<div class="error"><p>' . __('Styrka Athlete Assessment requires the Styrka Community plugin to be installed and activated.', 'styrka-athlete-assessment') . '</p></div>';
-}
+// Include required files.
+require_once STYRKA_ASSESSMENT_PLUGIN_DIR . 'includes/class-styrka-assessment-db.php';
+require_once STYRKA_ASSESSMENT_PLUGIN_DIR . 'includes/class-styrka-assessment-form.php';
+require_once STYRKA_ASSESSMENT_PLUGIN_DIR . 'includes/class-styrka-assessment-admin.php';
+require_once STYRKA_ASSESSMENT_PLUGIN_DIR . 'includes/class-styrka-assessment-charts.php';
+require_once STYRKA_ASSESSMENT_PLUGIN_DIR . 'includes/class-styrka-assessment-import.php';
+require_once STYRKA_ASSESSMENT_PLUGIN_DIR . 'includes/class-styrka-assessment-ajax.php';
+require_once STYRKA_ASSESSMENT_PLUGIN_DIR . 'includes/class-styrka-assessment-buddyboss.php';
 
 // Initialize the plugin.
 function styrka_assessment_init() {
-    error_log('Styrka Athlete Assessment: Initializing plugin.');
+    $db = new Styrka_Assessment_DB();
+    $form = new Styrka_Assessment_Form();
+    $admin = new Styrka_Assessment_Admin();
+    $charts = new Styrka_Assessment_Charts();
+    $import = new Styrka_Assessment_Import();
+    $ajax = new Styrka_Assessment_Ajax();
+    $buddyboss = new Styrka_Assessment_BuddyBoss();
 }
-add_action('plugins_loaded', 'styrka_assessment_init');
+add_action( 'plugins_loaded', 'styrka_assessment_init' );
 
-// Register admin menus.
-function styrka_assessment_admin_menu() {
-    error_log('Styrka Athlete Assessment: Adding admin menu.');
-
-    add_menu_page(
-        __('Styrka Athlete Assessment', 'styrka-athlete-assessment'),
-        __('Athlete Assessment', 'styrka-athlete-assessment'),
-        'manage_options',
-        'styrka-athlete-assessment',
-        'styrka_assessment_dashboard_page',
-        'dashicons-analytics'
-    );
-
-    add_submenu_page(
-        'styrka-athlete-assessment',
-        __('Import Assessment Data', 'styrka-athlete-assessment'),
-        __('Import Data', 'styrka-athlete-assessment'),
-        'manage_options',
-        'import-assessment-data',
-        'styrka_assessment_import_page'
-    );
-
-    add_submenu_page(
-        'styrka-athlete-assessment',
-        __('Athlete Assessments', 'styrka-athlete-assessment'),
-        __('Assessments', 'styrka-athlete-assessment'),
-        'manage_options',
-        'styrka-athlete-assessments',
-        'styrka_assessment_manage_assessments_page'
-    );
+// Enqueue scripts and styles
+function styrka_assessment_enqueue_scripts() {
+    wp_enqueue_script( 'styrka-assessment-js', STYRKA_ASSESSMENT_PLUGIN_URL . 'assets/js/assessment.js', array( 'jquery' ), STYRKA_ASSESSMENT_VERSION, true );
+    wp_localize_script( 'styrka-assessment-js', 'styrkaAjax', array( 'ajaxurl' => admin_url( 'admin-ajax.php' ) ) );
+    wp_enqueue_style( 'styrka-assessment-css', STYRKA_ASSESSMENT_PLUGIN_URL . 'assets/css/assessment.css', array(), STYRKA_ASSESSMENT_VERSION );
 }
-add_action('admin_menu', 'styrka_assessment_admin_menu');
-
-function styrka_assessment_dashboard_page() {
-    if (!current_user_can('manage_options')) {
-        wp_die(__('You do not have sufficient permissions to access this page.'));
-    }
-    echo '<div class="wrap"><h1>' . esc_html__('Styrka Athlete Assessment Dashboard', 'styrka-athlete-assessment') . '</h1>';
-}
-
-function styrka_assessment_import_page() {
-    if (!current_user_can('manage_options')) {
-        wp_die(__('You do not have sufficient permissions to access this page.'));
-    }
-    echo '<div class="wrap"><h1>' . esc_html__('Import Assessment Data', 'styrka-athlete-assessment') . '</h1>';
-    // Add the form for importing CSV files here.
-}
-
-function styrka_assessment_manage_assessments_page() {
-    if (!current_user_can('manage_options')) {
-        wp_die(__('You do not have sufficient permissions to access this page.'));
-    }
-    echo '<div class="wrap"><h1>' . esc_html__('Athlete Assessments', 'styrka-athlete-assessment') . '</h1>';
-    // Add the content for managing assessments here.
-}
+add_action( 'wp_enqueue_scripts', 'styrka_assessment_enqueue_scripts' );

@@ -3,6 +3,7 @@
 class Styrka_Assessment_DB {
     public function __construct() {
         register_activation_hook( __FILE__, array( $this, 'create_tables' ) );
+        add_action( 'admin_init', array( $this, 'create_tables' ) );
     }
 
     public function create_tables() {
@@ -35,6 +36,7 @@ class Styrka_Assessment_DB {
                 result float NOT NULL,
                 max_score float NOT NULL,
                 grade varchar(10) NOT NULL,
+                created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
                 PRIMARY KEY (id)
             ) $charset_collate;",
             
@@ -54,20 +56,21 @@ class Styrka_Assessment_DB {
             ) $charset_collate;",
             
             "CREATE TABLE {$wpdb->prefix}styrka_grading_criteria (
-				id mediumint(9) NOT NULL AUTO_INCREMENT,
-				category varchar(255) NOT NULL,
-				exercise varchar(255) NOT NULL,
-				gender varchar(10) NOT NULL,
-				age_group varchar(10) NOT NULL,
-				max_score float NOT NULL,
-				unit varchar(10) NOT NULL,
-				PRIMARY KEY (id)
+                id mediumint(9) NOT NULL AUTO_INCREMENT,
+                category varchar(255) NOT NULL,
+                exercise varchar(255) NOT NULL,
+                gender varchar(10) NOT NULL,
+                age_group varchar(10) NOT NULL,
+                max_score float NOT NULL,
+                unit varchar(10) NOT NULL,
+                PRIMARY KEY (id)
             ) $charset_collate;"
         ];
 
         require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
         foreach ( $tables as $sql ) {
-			dbDelta( $sql );
-		}
-	}
+            dbDelta( $sql );
+        }
+    }
 }
+?>

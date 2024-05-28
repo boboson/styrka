@@ -14,6 +14,15 @@ class Styrka_Assessment_Admin {
             'styrka-athlete-assessments',
             array( $this, 'display_assessment_page' )
         );
+
+        add_submenu_page(
+            'styrka-community',
+            __( 'Import Assessment Data', 'styrka-athlete-assessment' ),
+            __( 'Import Assessment Data', 'styrka-athlete-assessment' ),
+            'manage_options',
+            'import-assessment-data',
+            array( $this, 'display_import_page' )
+        );
     }
 
     public function display_assessment_page() {
@@ -57,4 +66,19 @@ class Styrka_Assessment_Admin {
         </div>
         <?php
     }
+
+    public function display_import_page() {
+        ?>
+        <div class="wrap">
+            <h1><?php _e( 'Import Assessment Data', 'styrka-athlete-assessment' ); ?></h1>
+            <form method="post" enctype="multipart/form-data" action="<?php echo admin_url( 'admin-post.php' ); ?>">
+                <input type="hidden" name="action" value="import_assessment_data">
+                <?php wp_nonce_field( 'styrka_import_nonce', 'styrka_import_nonce_field' ); ?>
+                <input type="file" name="assessment_csv" accept=".csv">
+                <input type="submit" value="<?php _e( 'Import CSV', 'styrka-athlete-assessment' ); ?>">
+            </form>
+        </div>
+        <?php
+    }
 }
+?>

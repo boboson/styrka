@@ -2,118 +2,85 @@
 
 class Styrka_Assessment_Form {
     public function __construct() {
-        add_shortcode( 'styrka_assessment_form', array( $this, 'display_assessment_form' ) );
-        add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
-        add_action( 'wp_ajax_submit_assessment', array( $this, 'handle_form_submission' ) );
-        add_action( 'wp_ajax_nopriv_submit_assessment', array( $this, 'handle_form_submission' ) );
+        add_action('wp_ajax_get_assessment_fields', array($this, 'get_assessment_fields'));
+        add_action('wp_ajax_nopriv_get_assessment_fields', array($this, 'get_assessment_fields'));
+        add_action('wp_ajax_save_assessment_data', array($this, 'save_assessment_data'));
+        add_action('wp_ajax_nopriv_save_assessment_data', array($this, 'save_assessment_data'));
     }
 
-	public function display_assessment_form() {
-		if ( ! is_user_logged_in() ) {
-			return '<p>' . __( 'You need to be logged in to access this form.', 'styrka-athlete-assessment' ) . '</p>';
-		}
+    public function get_assessment_fields() {
+        if (isset($_POST['type'])) {
+            $assessment_type = sanitize_text_field($_POST['type']);
+            global $wpdb;
+            $query = $wpdb->prepare(
+                "SELECT * FROM {$wpdb->prefix}styrka_grading_criteria WHERE category = %s", 
+                $assessment_type
+            );
+            $criteria = $wpdb->get_results($query);
 
-		ob_start();
-		?>
-		<form id="styrka-assessment-form" method="POST" action="">
-			<?php wp_nonce_field( 'styrka_assessment_nonce', 'styrka_assessment_nonce_field' ); ?>
-			<label for="assessment-type"><?php _e( 'Assessment Type', 'styrka-athlete-assessment' ); ?></label>
-			<select id="assessment-type" name="assessment_type">
-				<option value="basic"><?php _e( 'Basic', 'styrka-athlete-assessment' ); ?></option>
-				<option value="crossfit"><?php _e( 'CrossFit', 'styrka-athlete-assessment' ); ?></option>
-				<option value="hyrox"><?php _e( 'Hyrox', 'styrka-athlete-assessment' ); ?></option>
-			</select>
+            error_log("Executing query: " . $query);
+            error_log("Query results: " . print_r($criteria, true));
 
-			<div id="assessment-fields">
-				<!-- Dynamically generate fields based on assessment type -->
-			</div>
-
-			<input type="submit" value="<?php _e( 'Submit Assessment', 'styrka-athlete-assessment' ); ?>">
-		</form>
-		<?php
-		return ob_get_clean();
-	}
-
-    public function enqueue_scripts() {
-        wp_enqueue_script( 'styrka-assessment-js', STYRKA_ASSESSMENT_PLUGIN_URL . 'assets/js/assessment.js', array( 'jquery' ), STYRKA_ASSESSMENT_VERSION, true );
-        wp_enqueue_style( 'styrka-assessment-css', STYRKA_ASSESSMENT_PLUGIN_URL . 'assets/css/assessment.css', array(), STYRKA_ASSESSMENT_VERSION );
-    }
-
-    public function handle_form_submission() {
-        check_ajax_referer( 'styrka_assessment_nonce', 'security' );
-
-        $user_id = get_current_user_id();
-        $assessment_type = sanitize_text_field( $_POST['assessment_type'] );
-        $results = array_map( 'sanitize_text_field', $_POST['results'] );
-
-        // Perform data analysis and grading
-        $grades = $this->calculate_grades( $results, $user_id );
-
-        // Save to database
-        global $wpdb;
-        $wpdb->insert( $wpdb->prefix . 'styrka_assessments', array(
-            'athlete_id' => $user_id,
-            'assessment_type' => $assessment_type,
-            'created_at' => current_time( 'mysql' ),
-        ));
-        $assessment_id = $wpdb->insert_id;
-
-        foreach ( $results as $category => $exercises ) {
-            foreach ( $exercises as $exercise => $result ) {
-                $max_score = $this->get_max_score( $category, $exercise, $user_id );
-                $grade = $grades[$category][$exercise];
-
-                $wpdb->insert( $wpdb->prefix . 'styrka_assessment_results', array(
-                    'assessment_id' => $assessment_id,
-                    'category' => $category,
-                    'exercise' => $exercise,
-                    'result' => $result,
-                    'max_score' => $max_score,
-                    'grade' => $grade,
-                ));
+            if ($criteria) {
+                $html = '';
+                foreach ($criteria as $criterion) {
+                    $html .= '<div class="assessment-criterion">';
+                    $html .= '<label>' . esc_html($criterion->exercise) . ' (' . esc_html($criterion->unit) . '):</label>';
+                    $html .= '<input type="number" name="results[' . esc_attr($criterion->category) . '][' . esc_attr($criterion->exercise) . ']" step="any" required>';
+                    $html .= '</div>';
+                }
+                wp_send_json_success(['html' => $html]);
+            } else {
+                wp_send_json_error(['message' => 'No criteria found for the selected assessment type.']);
             }
-        }
-
-        wp_send_json_success( array( 'message' => __( 'Assessment submitted successfully!', 'styrka-athlete-assessment' ) ) );
-    }
-
-    private function get_max_score( $category, $exercise, $user_id ) {
-        global $wpdb;
-
-        $user_gender = xprofile_get_field_data( 'Gender', $user_id );
-        $user_age_group = xprofile_get_field_data( 'Age Group', $user_id );
-
-        return $wpdb->get_var( $wpdb->prepare(
-            "SELECT max_score FROM {$wpdb->prefix}styrka_grading_criteria WHERE category = %s AND exercise = %s AND gender = %s AND age_group = %s",
-            $category, $exercise, $user_gender, $user_age_group
-        ));
-    }
-
-    private function calculate_grades( $results, $user_id ) {
-        $grades = array();
-        foreach ( $results as $category => $exercises ) {
-            foreach ( $exercises as $exercise => $result ) {
-                $max_score = $this->get_max_score( $category, $exercise, $user_id );
-                $grades[$category][$exercise] = $this->determine_grade( $result, $max_score );
-            }
-        }
-        return $grades;
-    }
-
-    private function determine_grade( $result, $max_score ) {
-        // Example grading logic, adjust as needed
-        $percentage = ($result / $max_score) * 100;
-
-        if ( $percentage >= 90 ) {
-            return 'A';
-        } elseif ( $percentage >= 80 ) {
-            return 'B';
-        } elseif ( $percentage >= 70 ) {
-            return 'C';
-        } elseif ( $percentage >= 60 ) {
-            return 'D';
         } else {
-            return 'F';
+            wp_send_json_error(['message' => 'Assessment type not provided.']);
+        }
+    }
+
+    public function save_assessment_data() {
+        if (isset($_POST['assessment_type']) && isset($_POST['results']) && is_user_logged_in()) {
+            global $wpdb;
+            $user_id = get_current_user_id();
+            $assessment_type = sanitize_text_field($_POST['assessment_type']);
+            $results = $_POST['results'];
+            
+            // Insert assessment data
+            $wpdb->insert(
+                "{$wpdb->prefix}styrka_assessments",
+                [
+                    'athlete_id' => $user_id,
+                    'assessment_type' => $assessment_type,
+                    'created_at' => current_time('mysql')
+                ]
+            );
+            
+            $assessment_id = $wpdb->insert_id;
+            
+            // Insert results data
+            foreach ($results as $category => $exercises) {
+                foreach ($exercises as $exercise => $result) {
+                    $wpdb->insert(
+                        "{$wpdb->prefix}styrka_assessment_results",
+                        [
+                            'assessment_id' => $assessment_id,
+                            'category' => sanitize_text_field($category),
+                            'exercise' => sanitize_text_field($exercise),
+                            'result' => floatval($result),
+                            'max_score' => 100, // Assuming a max score placeholder
+                            'grade' => 'A', // Assuming a grade placeholder
+                            'created_at' => current_time('mysql')
+                        ]
+                    );
+                }
+            }
+            
+            wp_send_json_success(['message' => 'Assessment data saved successfully.']);
+        } else {
+            wp_send_json_error(['message' => 'Invalid data or not logged in.']);
         }
     }
 }
+
+new Styrka_Assessment_Form();
+?>
