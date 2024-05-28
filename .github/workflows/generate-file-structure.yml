@@ -1,0 +1,23 @@
+name: Generate File Structure
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Generate file structure
+      run: |
+        apt-get update
+        apt-get install tree
+        tree -a > file_structure.txt
+
+    - name: Upload file structure
+      uses: actions/upload-artifact@v2
+      with:
+        name: file-structure
+        path: file_structure.txt
