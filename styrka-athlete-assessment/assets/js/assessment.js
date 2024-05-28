@@ -1,58 +1,45 @@
 jQuery(document).ready(function($) {
     $('#assessment-type').change(function() {
-        var assessmentType = $(this).val();
-        console.log('Selected assessment type:', assessmentType);
-        if (assessmentType) {
-            $.ajax({
-                url: ajaxurl,
-                method: 'POST',
-                data: {
-                    action: 'get_assessment_fields',
-                    type: assessmentType,
-                },
-                success: function(response) {
-                    console.log('AJAX response:', response);
-                    if (response.success) {
-                        $('#assessment-fields').html(response.data.html);
-                    } else {
-                        alert(response.data.message || 'Failed to load assessment fields.');
-                    }
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    console.error('AJAX error:', textStatus, errorThrown);
-                    alert('An error occurred while fetching the assessment fields.');
-                }
-            });
-        }
-    });
-
-    $('#submit-assessment').click(function(e) {
-        e.preventDefault();
-        var assessmentType = $('#assessment-type').val();
-        var results = $('#assessment-form').serialize();
-        
-        console.log('Submitting assessment with type:', assessmentType);
-        console.log('Assessment results:', results);
-        
+        var assessment_type = $(this).val();
         $.ajax({
-            url: ajaxurl,
-            method: 'POST',
+            url: assessment_ajax.ajax_url,
+            type: 'POST',
             data: {
-                action: 'save_assessment_data',
-                assessment_type: assessmentType,
-                results: results,
+                action: 'get_assessment_fields',
+                assessment_type: assessment_type
             },
             success: function(response) {
-                console.log('Save AJAX response:', response);
-                if (response.success) {
-                    alert('Assessment data saved successfully.');
+                if(response.success) {
+                    $('#assessment-fields').html(response.data);
                 } else {
-                    alert(response.data.message || 'Failed to save assessment data.');
+                    alert(response.data);
                 }
+            }
+        });
+    });
+
+    $('#submit-assessment').click(function() {
+        var assessment_data = {};
+        $('#assessment-fields').find('input').each(function() {
+            var exercise = $(this).attr('name');
+            var result = $(this).val();
+            assessment_data[exercise] = result;
+        });
+
+        $.ajax({
+            url: assessment_ajax.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'submit_assessment',
+                assessment_type: $('#assessment-type').val(),
+                assessment_data: assessment_data
             },
-            error: function(jqXHR, textStatus, errorThrown) {
-                console.error('Save AJAX error:', textStatus, errorThrown);
-                alert('An error occurred while saving the assessment data.');
+            success: function(response) {
+                if(response.success) {
+                    alert('Assessment submitted successfully.');
+                } else {
+                    alert('Failed to submit assessment.');
+                }
             }
         });
     });
